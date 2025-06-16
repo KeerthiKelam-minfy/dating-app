@@ -12,12 +12,13 @@ async function fetchUsers() {
         }
 
         const response = await fetch(url);
-        if (!response.ok) throw new Error("Network response was not ok.");
+        if (!response.ok) 
+            throw new Error("Network response was not ok.");
 
         const data = await response.json();
         users = data.results;
         currentUserIndex = 0;
-        renderProfile();
+        renderProfile();  // Render the first profile
     } catch (error) {
         console.log("Failed to fetch users:", error);
     }
@@ -28,19 +29,17 @@ async function fetchUsers() {
 //gender filter.
 
 document.getElementById('gender-filter').addEventListener('change', (e) => {
-    genderPreference = e.target.value;
+    genderPreference = e.target.value; // here, what is the target and value?????
     currentUserIndex = 0;
 
-    // Show "Loading" message
+    // Show "Loading" message(loader)
     const profileContainer = document.querySelector('#profile-card-container');
-    profileContainer.innerHTML =  `<div class="loader"></div>`;
+    profileContainer.innerHTML = `<div class="loader"></div>`;
     fetchUsers(); // Refetch users with new preference
 });
 
 
-
-
-// 
+// rendering(get and displaying) profiles
 
 const profileContainer = document.querySelector('#profile-card-container')
 
@@ -110,7 +109,9 @@ document.getElementById('like-btn').addEventListener('click', () => {
     let matches = JSON.parse(localStorage.getItem('matches')) || [];
     // matches.push(user);
     // localStorage.setItem('matches', JSON.stringify(matches));
-    // Check if the user already exists in matches
+    // Check if the user already exists in matches (avoiding duplicate matches)
+
+    // what is this matches.some here???
     const alreadyMatched = matches.some(match => match.login.uuid === user.login.uuid);
     if (!alreadyMatched) {
         matches.push(user);
@@ -122,6 +123,8 @@ document.getElementById('like-btn').addEventListener('click', () => {
     const card = profileContainer.querySelector('.profile-pic');
     card.style.transform = 'translateX(100px) rotate(20deg)';
 
+
+    // why is this code written inside setTimeOut fn?
     setTimeout(() => {
         currentUserIndex++;
         renderProfile();
@@ -138,7 +141,8 @@ async function fetchMoreProfiles() {
         }
 
         const response = await fetch(url);
-        if (!response.ok) throw new Error("Failed to fetch more users.");
+        if (!response.ok) 
+            throw new Error("Failed to fetch more users.");
 
         const data = await response.json();
         users = data.results;
@@ -178,6 +182,8 @@ function loadAndRenderMatches() {
         return;
     }
 
+    // what is this data-id in this li tag
+    // join ??? 
     matchesList.innerHTML = matches.map(match => `
         <li data-id="${match.login.uuid}">
             <img src="${match.picture.thumbnail}" alt="${match.name.first}">
@@ -188,6 +194,7 @@ function loadAndRenderMatches() {
 
 
 // opening the messaging option when clicked on any your matches.
+// this one==> a little complex ...???
 matchesList.addEventListener('click', e => {
     const targetLi = e.target.closest('li');
     if (targetLi && targetLi.dataset.id) {
@@ -199,45 +206,80 @@ matchesList.addEventListener('click', e => {
 function openChat(userId) {
     const matches = JSON.parse(localStorage.getItem('matches')) || [];
     const user = matches.find(match => match.login.uuid === userId);
-
-    const messages = JSON.parse(localStorage.getItem(`chat-${userId}`)) || [];
+    currentMatchId = userId;
 
     const chatBox = document.getElementById('secret-messenger');
     const form = document.getElementById('message-form');
     const input = document.getElementById('message-input');
+    const chatBody = chatBox.querySelector('.chat-body');
 
-    // Clear and re-attach the chat body
-    let chatBody = chatBox.querySelector('.chat-body');
-    if (chatBody) chatBody.remove();
-    chatBody = document.createElement('div');
-    chatBody.className = 'chat-body';
-    chatBox.insertBefore(chatBody, form);
+    // Load messages from localStorage
+    const messages = JSON.parse(localStorage.getItem('allMessages')) || {};
+    const userMessages = messages[userId] || [];
 
-    chatBody.innerHTML = messages.map(msg => `<div>${msg}</div>`).join('');
+    chatBody.innerHTML = userMessages.map(msg => `
+        <div style="text-align:${msg.sender === 'me' ? 'right' : 'left'}">
+            <span>${msg.text}</span>
+        </div>
+    `).join('');
 
     form.onsubmit = e => {
         e.preventDefault();
-        const newMsg = input.value;
-        messages.push(newMsg);
-        localStorage.setItem(`chat-${userId}`, JSON.stringify(messages));
-        chatBody.innerHTML += `<div>${newMsg}</div>`;
+        const newText = input.value.trim();
+        if (!newText) return;
+
+        // Save new message
+        const updatedMessages = JSON.parse(localStorage.getItem('allMessages')) || {};
+        if (!updatedMessages[userId]) updatedMessages[userId] = [];
+
+        updatedMessages[userId].push({ text: newText, sender: 'me' });
+        localStorage.setItem('allMessages', JSON.stringify(updatedMessages));
+
+        // Update chat visually
+        chatBody.innerHTML += `
+            <div style="text-align:right"><span>${newText}</span></div>
+        `;
         input.value = '';
+
+        // Simulate funny reply
+        setTimeout(() => {
+            const fakeReplies = [
+                "Heyy",
+                "Haha good one 😄",
+                "I needed that laugh 😂",
+                "You're funny!",
+                "Tell me more!",
+                "That's wild 🤯",
+                "I wasn’t expecting that!",
+                "Pizza sounds good 🍕",
+                "Me too!",
+                "Interesting..."
+            ];
+            const reply = fakeReplies[Math.floor(Math.random() * fakeReplies.length)];
+
+            updatedMessages[userId].push({ text: reply, sender: 'them' });
+            localStorage.setItem('allMessages', JSON.stringify(updatedMessages));
+
+            chatBody.innerHTML += `
+                <div style="text-align:left"><span>${reply}</span></div>
+            `;
+        }, 1000 + Math.random() * 1000);
     };
+
+    document.getElementById('chat-header').innerHTML = `
+        <span>Messaging ${user.name.first}</span>
+        <button id="close-chat">✖️</button>
+    `;
 
     document.getElementById('overlay').classList.remove('hidden');
     chatBox.classList.remove('hidden');
 
-    document.getElementById('chat-header').innerHTML = `
-    <span>Messaging ${user.name.first}</span>
-    <button id="close-chat">✖️</button>`;
-
-    // Add event listener for close button
     document.getElementById('close-chat').addEventListener('click', () => {
         document.getElementById('overlay').classList.add('hidden');
         document.getElementById('secret-messenger').classList.add('hidden');
     });
-
 }
+
 
 
 document.getElementById('clear-matches-btn').addEventListener('click', () => {
